@@ -1,0 +1,14 @@
+{
+  "name": "m3u8-cors-proxy",
+  "version": "1.0.0",
+  "description": "Node.js proxy for M3U8/TS streams bypassing CORS and Referer restrictions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}
