@@ -1,7 +1,7 @@
 {
-  "name": "m3u8-cors-proxy",
+  "name": "ppkq",
   "version": "1.0.0",
-  "description": "Node.js proxy for M3U8/TS streams bypassing CORS and Referer restrictions",
+  "description": "ppkq",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
