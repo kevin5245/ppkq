@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 8080;
 
 const ROUTE_MAP = {
 
-    '/fqzb/': { target: 'https://zb-play.wjhwpd.com', referer: 'https://fqzb7.com/' },
+    '/rrty/': { target: 'https://play.wjhwpd.com', referer: 'https://fqzb163.com/' },
 
     '/live/': { target: 'https://video10.letaocm.top', referer: 'https://688zb24.com/' },
 
