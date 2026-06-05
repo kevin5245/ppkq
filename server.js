@@ -8,14 +8,13 @@ const ROUTE_MAP = {
     '/live/': { target: 'https://video10.letaocm.top', referer: 'https://688zb24.com/' },
     '/kafei/': { target: 'https://pull.livecdn.cc', referer: 'https://kafeizhibo.com/', strip: true },
     '/qinl/': { target: 'https://qinl-play.agiaexpress.com', referer: 'https://www.hbzb27.com/', strip: true },
-    // 新增的代理路由
     '/ssports/': { target: 'https://hls.zb.ssports.com', referer: 'https://shinaisports.com/' } 
 };
 
 // 🚨 关键修复 1：创建一个支持长连接的 HTTPS Agent，对 HTTP-FLV 维持流态至关重要
 const keepAliveAgent = new https.Agent({
     keepAlive: true,
-    rejectUnauthorized: false // 忽略部分目标服务器的 SSL 证书验证问题，防止握手失败
+    rejectUnauthorized: false // 忽略部分目标服务器的 SSL 证书验证问题
 });
 
 const server = http.createServer((req, res) => {
@@ -64,7 +63,7 @@ const server = http.createServer((req, res) => {
         // 🚨 关键修复 3：强制向上游服务器请求长连接
         'Connection': 'keep-alive', 
         
-        // 🚨 关键修复 4：重写 Host，防止带着本地 localhost 的 Host 去请求 CDN，否则会被秒踢
+        // 🚨 关键修复 4：重写 Host，防止带着本地机器的 Host 去请求 CDN 被踢
         'Host': targetHost
     };
 
@@ -74,7 +73,7 @@ const server = http.createServer((req, res) => {
     // 3. 发起代理请求
     https.get(targetUrl, { headers, agent: keepAliveAgent }, (srcRes) => {
         
-        // 监控是否触发了防盗链的 302 重定向（通常被拦截会跳到错误页）
+        // 监控是否触发了防盗链的 302 重定向
         if (srcRes.statusCode >= 300 && srcRes.statusCode < 400) {
             console.warn(`[Redirect/Block Warn] ${targetUrl} -> ${srcRes.headers.location}`);
         }
@@ -84,15 +83,20 @@ const server = http.createServer((req, res) => {
         delete srcRes.headers['access-control-allow-methods'];
         delete srcRes.headers['access-control-allow-credentials'];
 
-        // 🚨 关键修复 5：处理 HTTP-FLV 的分块传输问题
-        // 干掉源站可能的 Content-Length，防止播放器把它当成定长文件而终止
+        // 🚨 关键修复 5：干掉源站可能的 Content-Length，防止播放器把它当成定长文件而终止
         delete srcRes.headers['content-length'];
         
-        // 合并我们自己设置的 CORS 头，并显式声明为分块传输的无限流
+        // 🚨 关键修复 6：处理 HTTP-FLV 分块传输，并穿透 Render 平台的 Nginx 缓冲
         const responseHeaders = { 
             ...srcRes.headers, 
             ...corsHeaders,
-            'Transfer-Encoding': 'chunked' 
+            'Transfer-Encoding': 'chunked',
+            
+            // 下面这四行是专门针对 Render/PaaS 平台的魔法 Header
+            'X-Accel-Buffering': 'no',  // 命令底层 Nginx 关闭缓冲，实时转发 FLV 流
+            'Cache-Control': 'no-cache, no-store, must-revalidate', 
+            'Pragma': 'no-cache',
+            'Expires': '0'
         };
 
         res.writeHead(srcRes.statusCode, responseHeaders);
@@ -102,7 +106,7 @@ const server = http.createServer((req, res) => {
         
     }).on('error', (e) => {
         console.error(`[Proxy Error] ${targetUrl} - ${e.message}`);
-        // 🚨 关键修复 6：防止由于网络波动导致重复响应，从而引发 Node.js 奔溃
+        // 防止由于网络波动导致重复响应，引发 Node.js 崩溃
         if (!res.headersSent) {
             res.writeHead(500, corsHeaders); 
             res.end(`Proxy Error: ${e.message}`);
