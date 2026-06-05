@@ -11,21 +11,18 @@ const ROUTE_MAP = {
     '/ssports/': { target: 'https://hls.zb.ssports.com', referer: 'https://shinaisports.com/' } 
 };
 
-// 🚨 关键修复 1：创建一个支持长连接的 HTTPS Agent，对 HTTP-FLV 维持流态至关重要
 const keepAliveAgent = new https.Agent({
     keepAlive: true,
-    rejectUnauthorized: false // 忽略部分目标服务器的 SSL 证书验证问题
+    rejectUnauthorized: false
 });
 
 const server = http.createServer((req, res) => {
-    // 1. 统一设置我们自己的 CORS 头
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': '*'
     };
 
-    // 处理预检请求
     if (req.method === 'OPTIONS') { 
         res.writeHead(204, corsHeaders);
         return res.end(); 
@@ -40,73 +37,47 @@ const server = http.createServer((req, res) => {
     }
 
     const config = ROUTE_MAP[matched];
-    let finalPath = url.pathname;
-    
-    // 如果开启 strip，将匹配到的前缀替换为 '/'
-    if (config.strip) {
-        finalPath = url.pathname.replace(matched, '/');
-    }
+    let finalPath = config.strip ? url.pathname.replace(matched, '/') : url.pathname;
+    const targetUrlStr = `${config.target}${finalPath}${url.search}`;
+    const targetUrl = new URL(targetUrlStr);
 
-    const targetUrl = `${config.target}${finalPath}${url.search}`;
-    const targetHost = new URL(targetUrl).host;
-
-    // 2. 伪装请求头，欺骗目标服务器
     const headers = {
         'Referer': config.referer,
         'Origin': new URL(config.referer).origin,
-        // 尽量透传真实浏览器的 User-Agent
         'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        
-        // 🚨 关键修复 2：透传 Cookie（部分防盗链基于会话）
         'Cookie': req.headers['cookie'] || '', 
-        
-        // 🚨 关键修复 3：强制向上游服务器请求长连接
         'Connection': 'keep-alive', 
-        
-        // 🚨 关键修复 4：重写 Host，防止带着本地机器的 Host 去请求 CDN 被踢
-        'Host': targetHost
+        'Host': targetUrl.host,
+        // 🚨 核心修复：强制禁止上游 CDN 使用 GZIP 压缩，防止数据包解析错误导致 3 秒断流
+        'Accept-Encoding': 'identity'
     };
 
-    // 清理空 Cookie，防止请求头格式异常
     if (!headers['Cookie']) delete headers['Cookie'];
 
-    // 3. 发起代理请求
-    https.get(targetUrl, { headers, agent: keepAliveAgent }, (srcRes) => {
+    https.get(targetUrlStr, { headers, agent: keepAliveAgent }, (srcRes) => {
         
-        // 监控是否触发了防盗链的 302 重定向
-        if (srcRes.statusCode >= 300 && srcRes.statusCode < 400) {
-            console.warn(`[Redirect/Block Warn] ${targetUrl} -> ${srcRes.headers.location}`);
-        }
-
-        // 删除目标服务器自带的 CORS 相关头，防止冲突覆盖
         delete srcRes.headers['access-control-allow-origin'];
         delete srcRes.headers['access-control-allow-methods'];
         delete srcRes.headers['access-control-allow-credentials'];
 
-        // 🚨 关键修复 5：干掉源站可能的 Content-Length，防止播放器把它当成定长文件而终止
+        // 🚨 核心修复：必须删除 content-length，防止播放器误判流已结束
         delete srcRes.headers['content-length'];
         
-        // 🚨 关键修复 6：处理 HTTP-FLV 分块传输，并穿透 Render 平台的 Nginx 缓冲
         const responseHeaders = { 
             ...srcRes.headers, 
             ...corsHeaders,
-            'Transfer-Encoding': 'chunked',
-            
-            // 下面这四行是专门针对 Render/PaaS 平台的魔法 Header
-            'X-Accel-Buffering': 'no',  // 命令底层 Nginx 关闭缓冲，实时转发 FLV 流
+            'Transfer-Encoding': 'chunked', // 强制分块传输
+            'X-Accel-Buffering': 'no',      // 穿透 Render/Nginx 缓存
             'Cache-Control': 'no-cache, no-store, must-revalidate', 
             'Pragma': 'no-cache',
             'Expires': '0'
         };
 
         res.writeHead(srcRes.statusCode, responseHeaders);
-        
-        // 使用 pipe 高效传输流媒体
         srcRes.pipe(res);
         
     }).on('error', (e) => {
-        console.error(`[Proxy Error] ${targetUrl} - ${e.message}`);
-        // 防止由于网络波动导致重复响应，引发 Node.js 崩溃
+        console.error(`[Proxy Error] ${targetUrlStr} - ${e.message}`);
         if (!res.headersSent) {
             res.writeHead(500, corsHeaders); 
             res.end(`Proxy Error: ${e.message}`);
