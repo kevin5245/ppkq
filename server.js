@@ -4,7 +4,7 @@ const https = require('https');
 const PORT = process.env.PORT || 8080;
 
 const ROUTE_MAP = {
-    '/rrty/': { target: 'https://play.wjhwpd.com', referer: 'https://fqzb163.com/' },
+    '/rrty/': { target: 'https://play.ntcwix.com', referer: 'https://fqzb163.com/' },
     '/live/': { target: 'https://video10.letaocm.top', referer: 'https://688zb24.com/' },
     '/kafei/': { target: 'https://pull.livecdn.cc', referer: 'https://kafeizhibo.com/', strip: true },
     '/qinl/': { target: 'https://qinl-play.agiaexpress.com', referer: 'https://www.hbzb27.com/', strip: true },
