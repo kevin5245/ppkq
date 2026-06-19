@@ -7,7 +7,8 @@ const ROUTE_MAP = {
     '/rrty/': { target: 'https://play.ntcwix.com', referer: 'https://fqzb163.com/' },
     '/live/': { target: 'https://video10.letaocm.top', referer: 'https://688zb24.com/' },
     '/kafei/': { target: 'https://pull.livecdn.cc', referer: 'https://kafeizhibo.com/', strip: true },
-    '/qinl/': { target: 'https://qinl-play.agiaexpress.com', referer: 'https://www.hbzb27.com/', strip: true },
+    // 👇 已将 target 更新为新的流媒体域名 play.br60g6.com，referer 保持原站点以绕过防盗链
+    '/qinl/': { target: 'https://play.br60g6.com', referer: 'https://www.hbzb27.com/', strip: true },
     '/ssports/': { target: 'https://hls.zb.ssports.com', referer: 'https://shinaisports.com/' } 
 };
 
@@ -38,6 +39,11 @@ const server = http.createServer((req, res) => {
 
     const config = ROUTE_MAP[matched];
     let finalPath = config.strip ? url.pathname.replace(matched, '/') : url.pathname;
+    
+    // 自动处理替换后的路径合并问题，防止出现双斜杠或少斜杠
+    if (finalPath.startsWith('//')) finalPath = finalPath.substring(1);
+    if (!finalPath.startsWith('/')) finalPath = '/' + finalPath;
+    
     const targetUrlStr = `${config.target}${finalPath}${url.search}`;
     const targetUrl = new URL(targetUrlStr);
 
