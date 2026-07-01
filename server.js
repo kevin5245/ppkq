@@ -12,9 +12,10 @@ const ROUTE_MAP = {
     '/qinl/': { target: 'https://play.br60g6.com', referer: 'https://www.hbzb27.com/', strip: true },
     '/ssports/': { target: 'https://hls.zb.ssports.com', referer: 'https://shinaisports.com/' },
     
-    // 👇 熊猫电竞与体育线路 (保持原路径 /esport/ 和 /sport/，无需 strip)
+    // 👇 熊猫电竞与体育线路系列 (保持原路径，无需 strip)
     '/esport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
-    '/sport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' }
+    '/sport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
+    '/sp/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' } // 👈 新增的 /sp/ 线路
 };
 
 // 保持 HTTP 长连接，提升拉取 M3U8 切片时的稳定性和速度
