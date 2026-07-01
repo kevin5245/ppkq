@@ -15,7 +15,10 @@ const ROUTE_MAP = {
     // 👇 熊猫电竞与体育线路系列 (保持原路径，无需 strip)
     '/esport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
     '/sport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
-    '/sp/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' } // 👈 新增的 /sp/ 线路
+    '/sp/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
+    
+    // 👇 1827线路 (保持原路径 /sla/，无需 strip)
+    '/sla/': { target: 'https://tk-hd-liven.fheuuw.com', referer: 'https://www.1827.com/' }
 };
 
 // 保持 HTTP 长连接，提升拉取 M3U8 切片时的稳定性和速度
@@ -57,7 +60,7 @@ const server = http.createServer((req, res) => {
     if (finalPath.startsWith('//')) finalPath = finalPath.substring(1);
     if (!finalPath.startsWith('/')) finalPath = '/' + finalPath;
     
-    // 拼接最终的目标 URL (包含查询参数，如 txSecret 等防盗链签名)
+    // 拼接最终的目标 URL (包含查询参数，如 auth_key 等防盗链签名)
     const targetUrlStr = `${config.target}${finalPath}${url.search}`;
     const targetUrl = new URL(targetUrlStr);
 
