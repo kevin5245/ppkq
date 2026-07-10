@@ -12,22 +12,22 @@ const ROUTE_MAP = {
     '/qinl/': { target: 'https://play.br60g6.com', referer: 'https://www.hbzb27.com/', strip: true },
     '/ssports/': { target: 'https://hls.zb.ssports.com', referer: 'https://shinaisports.com/' },
     
-    // 👇 熊猫电竞与体育线路系列 (保持原路径，无需 strip)
+    // 熊猫电竞与体育线路系列 (保持原路径，无需 strip)
     '/esport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
     '/sport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
     '/sp/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
     
-    // 👇 1827线路 (保持原路径 /sla/，无需 strip)
+    // 1827线路 (保持原路径 /sla/，无需 strip)
     '/sla/': { target: 'https://tk-hd-liven.fheuuw.com', referer: 'https://www.1827.com/' },
 
-    // 👇 sb 线路 (新增，使用 /sb/ 前缀避免与上面 pandascore 的 /sport/ 冲突)
+    // sb 线路
     '/sb/': { target: 'https://voide.sb-live.org', referer: 'https://sb9275.net/', strip: true },
 
-    // 👇 vivo 线路 (新增)
+    // vivo 线路
     '/vivo/': { target: 'https://live.vivo200.com', referer: 'https://player.online909.com/', strip: true }
 };
 
-// 保持 HTTP 长连接，提升拉取 M3U8 切片时的稳定性和速度
+// 保持 HTTP 长连接，提升拉取切片时的稳定性和速度
 const keepAliveAgent = new https.Agent({
     keepAlive: true,
     rejectUnauthorized: false // 忽略目标服务器可能存在的自签名证书问题
@@ -78,29 +78,31 @@ const server = http.createServer((req, res) => {
         'Cookie': req.headers['cookie'] || '', 
         'Connection': 'keep-alive', 
         'Host': targetUrl.host,
-        // 🚨 核心修复：强制禁止上游 CDN 使用 GZIP 压缩，防止 M3U8 解析错误导致断流
+        // 强制禁止上游 CDN 使用 GZIP 压缩，防止视频流解析错误
         'Accept-Encoding': 'identity'
     };
 
     if (!headers['Cookie']) delete headers['Cookie'];
 
     // 5. 发起代理请求到真实的流媒体服务器
-    https.get(targetUrlStr, { headers, agent: keepAliveAgent }, (srcRes) => {
+    // ⚠️ 修复点：将请求赋值给 proxyReq，以便在客户端断开时销毁它
+    const proxyReq = https.get(targetUrlStr, { headers, agent: keepAliveAgent }, (srcRes) => {
         
-        // 删除源服务器自身的 CORS 头，避免与我们代理层的 corsHeaders 冲突
+        // 删除源服务器自身的 CORS 头，避免冲突
         delete srcRes.headers['access-control-allow-origin'];
         delete srcRes.headers['access-control-allow-methods'];
         delete srcRes.headers['access-control-allow-credentials'];
 
-        // 🚨 核心修复：必须删除 content-length，防止播放器误判流已结束 (解决播几秒就卡住的问题)
+        // 🚨 502 核心修复1：同时删除 Content-Length 和 Transfer-Encoding，防止向 Cloudflare/Render 发送重复或矛盾的流传输协议
         delete srcRes.headers['content-length'];
+        delete srcRes.headers['transfer-encoding'];
         
         // 组装最终返回给本地播放器的 Header
         const responseHeaders = { 
             ...srcRes.headers, 
             ...corsHeaders,
-            'Transfer-Encoding': 'chunked', // 强制分块传输，适合直播流
-            'X-Accel-Buffering': 'no',      // 穿透 Nginx 等反代服务器的缓存，降低延迟
+            'Transfer-Encoding': 'chunked', // 代理层重新强制声明分块传输
+            'X-Accel-Buffering': 'no',      // 穿透缓存，降低直播延迟
             'Cache-Control': 'no-cache, no-store, must-revalidate', 
             'Pragma': 'no-cache',
             'Expires': '0'
@@ -109,9 +111,15 @@ const server = http.createServer((req, res) => {
         // 将状态码和处理后的请求头发送给播放器
         res.writeHead(srcRes.statusCode, responseHeaders);
         
-        // 将视频流数据直接以管道 (pipe) 形式透传给播放器
+        // 将视频流数据透传给播放器
         srcRes.pipe(res);
         
+        // 🚨 502 核心修复2：当浏览器或播放器停止播放（断开连接）时，必须销毁上游的视频流！
+        // 否则持续下载的数据会撑爆内存，导致 Render 重启你的应用，对外抛出 502 错误。
+        req.on('close', () => {
+            srcRes.destroy();
+        });
+
     }).on('error', (e) => {
         console.error(`[Proxy Error] ${targetUrlStr} - ${e.message}`);
         if (!res.headersSent) {
@@ -119,12 +127,23 @@ const server = http.createServer((req, res) => {
             res.end(`Proxy Error: ${e.message}`);
         }
     });
+
+    // 🚨 502 核心修复3：如果客户端在成功连接上游前就刷新了页面，直接终止代理请求
+    req.on('close', () => {
+        if (proxyReq && !proxyReq.destroyed) {
+            proxyReq.destroy();
+        }
+    });
 });
 
 // 启动服务器
 server.listen(PORT, () => {
     console.log(`\n=========================================`);
-    console.log(`🚀 Proxy Server running on http://localhost:${PORT}`);
+    if (process.env.RENDER_EXTERNAL_URL) {
+        console.log(`🚀 Proxy Server running on ${process.env.RENDER_EXTERNAL_URL}`);
+    } else {
+        console.log(`🚀 Proxy Server running on http://localhost:${PORT}`);
+    }
     console.log(`=========================================`);
     console.log(`已加载的路由规则:`);
     Object.keys(ROUTE_MAP).forEach(route => {
