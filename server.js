@@ -24,7 +24,10 @@ const ROUTE_MAP = {
     '/sb/': { target: 'https://voide.sb-live.org', referer: 'https://sb9275.net/', strip: true },
 
     // vivo 线路
-    '/vivo/': { target: 'https://live.vivo200.com', referer: 'https://player.online909.com/', strip: true }
+    '/vivo/': { target: 'https://live.vivo200.com', referer: 'https://player.online909.com/', strip: true },
+
+    // 新增的 b-cdn 线路
+    '/bcdn/': { target: 'https://llivewithhy.b-cdn.net', referer: 'https://1b6gazd2.tukartukar88.xyz/', strip: true }
 };
 
 // 保持 HTTP 长连接，提升拉取切片时的稳定性和速度
