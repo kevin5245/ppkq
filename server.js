@@ -21,7 +21,10 @@ const ROUTE_MAP = {
     '/sla/': { target: 'https://tk-hd-liven.fheuuw.com', referer: 'https://www.1827.com/' },
 
     // 👇 sb 线路 (新增，使用 /sb/ 前缀避免与上面 pandascore 的 /sport/ 冲突)
-    '/sb/': { target: 'https://voide.sb-live.org', referer: 'https://sb9275.net/', strip: true }
+    '/sb/': { target: 'https://voide.sb-live.org', referer: 'https://sb9275.net/', strip: true },
+
+    // 👇 vivo 线路 (新增)
+    '/vivo/': { target: 'https://live.vivo200.com', referer: 'https://player.online909.com/', strip: true }
 };
 
 // 保持 HTTP 长连接，提升拉取 M3U8 切片时的稳定性和速度
