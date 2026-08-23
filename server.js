@@ -13,9 +13,9 @@ const ROUTE_MAP = {
     '/ssports/': { target: 'https://hls.zb.ssports.com', referer: 'https://shinaisports.com/' },
     
     // 熊猫电竞与体育线路系列 (保持原路径，无需 strip)
-    '/esport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
-    '/sport/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
-    '/sp/': { target: 'https://pull.pandascore.vip', referer: 'https://pandascore.live/' },
+    '/esport/': { target: 'https://sport.esptv666.com', referer: 'https://pandascore.live/' },
+    '/sport/': { target: 'https://sport.esptv666.com', referer: 'https://pandascore.live/' },
+    '/sp/': { target: 'https://sport.esptv666.com', referer: 'https://pandascore.live/' },
     
     // 1827线路 (保持原路径 /sla/，无需 strip)
     '/sla/': { target: 'https://tk-hd-liven.fheuuw.com', referer: 'https://www.1827.com/' },
